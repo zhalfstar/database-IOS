@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.4</title>
+<title>轻量数据库 · v2026-10-23.10</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -314,7 +314,8 @@ table.grid .g-num{position:absolute;top:0;right:0;font-size:9px;line-height:1;mi
 #group-panel .gp-name{flex:1;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--text)}
 #group-panel .gp-name:hover{background:var(--panel2)}
 #group-panel .gp-del{border:none;background:#fee4e4;color:#e5484d;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;white-space:nowrap}
-#group-panel .gp-btns{display:flex;gap:8px;margin-top:8px}
+#group-panel .gp-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+#group-panel .gp-btns button{flex:1 1 auto;min-width:64px}
 #group-panel .gp-close{flex:1;padding:6px 0;border:none;border-radius:6px;background:var(--panel2);color:var(--text);cursor:pointer}
 #group-panel .gp-dissolve{flex:1;padding:6px 0;border:1px solid #f2b8bb;border-radius:6px;background:var(--panel);color:#e5484d;cursor:pointer}
 #group-panel .gp-addlink{flex:1;padding:6px 0;border:1px solid #cfe0ff;border-radius:6px;background:var(--panel);color:#4285F4;cursor:pointer}
@@ -982,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.4">v2026-10-23.4</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.10">v2026-10-23.10</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2464,6 +2465,7 @@ function ovSelBar(){
     b.className = 'ov-selbar';
     b.innerHTML = '<span class="n"></span>'
       + '<button type="button" class="btn sm" onclick="ovSelMove()">' + svg('i-folder') + ' 移入文件夹</button>'
+      + '<button type="button" class="btn sm" onclick="ovSelExport()">' + svg('i-share') + ' 导出</button>'
       + '<button type="button" class="btn sm danger" onclick="ovSelDelete()">' + svg('i-trash') + ' 删除</button>'
       + '<button type="button" class="btn sm ghost" onclick="ovSelEnd()">取消</button>';
     document.body.appendChild(b);
@@ -2492,6 +2494,13 @@ function ovSelMove(){
 function ovSelMoveToIdx(i){
   const r = (window._ovMoveRows || [])[i];
   if(r) ovSelMoveTo(r.id);
+}
+/* 多选后一起导出：把选中的工作簿（含其全部工作表）打包成一个 JSON */
+function ovSelExport(){
+  if(!_ovSel || !_ovSel.size) return;
+  const list = bookExpand([..._ovSel].map(id => (db.tables || []).find(t=>t.id === id)).filter(Boolean));
+  if(!list.length){ toast('没有可导出的数据表'); return; }
+  openExportChoice(list, '选中的数据表', '已选 ' + _ovSel.size + ' 项');
 }
 function ovSelMoveTo(fid){
   const ids = [...(_ovSel || [])];
@@ -2744,6 +2753,10 @@ function showOverviewMenu(x, y, scope){
     t.textContent = scopeName() + ' · 仅此文件夹';
     menu.appendChild(t);
     if(isRealFolder()) addRow('修改文件夹名称', false, ()=>{ closeOvMenu(); openRenameFolder(scope); });
+    if(isRealFolder()) addRow('分享 / 导出此文件夹', false, ()=>{
+      closeOvMenu();
+      openExportChoice(bookExpand(folderTables(scope)), scopeName(), '文件夹「' + scopeName() + '」');
+    });
     if(!inFolderView()) addRow('新建文件夹', false, ()=>{ closeOvMenu(); openCreateFolder(); });
     addRow('查看方式', true, ()=>renderView());
     addRow('排序', true, ()=>renderSort());
@@ -5489,7 +5502,8 @@ function openHelp(){
     '<h3 style="margin:0 0 8px">基础操作</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>点击数据表卡片</b>：进入表查看记录</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按数据表卡片</b>：重命名、分享、删除</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>批量整理（多选）</b>：概览右上角点「<b>选择</b>」，或长按卡片选「☑ 多选（批量移动/删除）」，每张卡片前会出现复选框。勾好几张后，用底部操作条<b>一次移入某个文件夹</b>（也可就地新建文件夹）或<b>一次删除</b>（进回收站可恢复）。<b>手机上没有"拖进文件夹"</b>——拖动用的是电脑浏览器的拖放功能，触屏上不生效，用这个「移入文件夹」即可，效果一样</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>批量整理（多选）</b>：概览右上角点「<b>选择</b>」，或长按卡片选「☑ 多选（批量移动/删除）」，每张卡片前会出现复选框。勾好几张后，用底部操作条<b>一次移入某个文件夹</b>（也可就地新建文件夹）、<b>一次导出</b>（打包成一个 JSON，含各自的文件夹）、或<b>一次删除</b>（进回收站可恢复）。<b>手机上没有"拖进文件夹"</b>——拖动用的是电脑浏览器的拖放功能，触屏上不生效，用这个「移入文件夹」即可，效果一样</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>文件夹</b>：长按文件夹标题可<b>改名</b>、<b>分享/导出整个文件夹</b>（导出会连文件夹一起带上，对方导入后自动归到同名文件夹，不会全挤到「未分类」）</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>拖动数据表卡片</b>：调整顺序或归类到文件夹</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>新建时可套模板</b>：新建数据表弹窗里选「从模板开始」，内置读书清单、记账、客户名单、库存管理、健身记录、待办清单；库存模板还自带一条「数量 &lt; 10 标红」的条件格式</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按文件夹</b>（标题行或块内任意位置都行，手机上更好按）：弹出菜单 —— <b>修改文件夹名称</b>、新建文件夹、查看方式、排序</p>'+
@@ -5561,7 +5575,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.10</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6008,9 +6022,14 @@ function cellInnerHTML(t, r, f, ctx){
   const firstFid = t.fields.length ? t.fields[0].id : '';
   const gid = r.links && (r.links[f.id] || (f.id===firstFid && r.links.__any__));
   const gnum = gid && gnums[gid] ? gnums[gid] : '';
-  const xgb = (db.xgroups||[]).map((g,i)=>({g,i})).filter(o=>o.g.rows.some(m=>m.t===t.id && m.r===r.id));
-  const xbadge = xgb.map(o=>`<span class="g-num xg" title="跨表关联组（点击查看成员及来源）" onclick="showXGroup('${t.id}','${o.g.id}',event)">X${o.i+1}</span>`).join('');
-  return `${ctx.rowRes||''}${displayVal(r,f)}${gnum?`<span class="g-num" title="查看关联组成员" onclick="showGroupMembers('${t.id}','${f.id}','${gid}',event)">${gnum}</span>`:''}${xMountIds.has(f.id)?xbadge:''}`;
+  // 这一行还在哪些跨表组里（去掉和上面同一个组的，避免同一个组画两个角标「1,X1」）
+  const xgIds = (db.xgroups||[]).map(g=>g.id).filter(gid2=>
+    gid2 !== gid && (db.xgroups||[]).some(g=>g.id===gid2 && (g.rows||[]).some(m=>m.t===t.id && m.r===r.id)));
+  // 跨表那侧（本表行没有 links）用**同一个数字**，只是样式不同 + 提示"跨表"
+  const xbadge = (!gnum && xgIds.length && xMountIds.has(f.id))
+    ? `<span class="g-num xg" title="跨表关联组（点击查看成员及来源）" onclick="showXGroup('${t.id}','${xgIds[0]}',event)">${gnums[xgIds[0]] || '?'}</span>`
+    : '';
+  return `${ctx.rowRes||''}${displayVal(r,f)}${gnum?`<span class="g-num" title="查看关联组成员" onclick="showGroupMembers('${t.id}','${f.id}','${gid}',event)">${gnum}</span>`:''}${xbadge}`;
 }
 /* ===== 单元格就地编辑（**只在电脑版**；手机/平板完全不走这里）=====
    交互：双击某个单元格 → 变成输入框 → 回车/点别处提交，Esc 取消，Tab 提交并跳到右边一格。
@@ -6378,18 +6397,26 @@ function bindThTap(grid){
   });
 }
 let linkMode = null;
-function groupNumbers(t){
+/* 组别号：**全库一套编号** ✗ —— 以前 `groupNumbers(t)` 是"按这张表的行顺序"编号，
+   跨表那侧又用 `db.xgroups` 的数组下标（还带个 X 前缀），两套号根本对不上：
+   同一个组在客户表叫「组1」、在订单表叫「X1」，用户看到的就是"新成员组别号不一样"（真机 2026-10-23）✗
+   现在统一：先按表顺序+行顺序给所有"行上挂着的组"编号，再给只在 xgroups 里的组补号 ✓ */
+function groupNoMap(){
   const m = {};
   let n = 0;
-  (t.rows||[]).forEach(r=>{
-    if(!r || !r.links) return;
-    Object.keys(r.links).forEach(fid=>{
-      const gid = r.links[fid];
-      if(gid && !(gid in m)) m[gid] = ++n;
+  (db.tables||[]).forEach(t=>{
+    (t.rows||[]).forEach(r=>{
+      if(!r || !r.links) return;
+      Object.keys(r.links).forEach(fid=>{
+        const gid = r.links[fid];
+        if(gid && !(gid in m)) m[gid] = ++n;
+      });
     });
   });
+  (db.xgroups||[]).forEach(g=>{ if(g && g.id && !(g.id in m)) m[g.id] = ++n; });
   return m;
 }
+function groupNumbers(t){ return groupNoMap(); }
 function collectGroupRows(tableId, fieldId, gid, xg, anchorT){
   const localT = anchorT || (tableId ? db.tables.find(x=>x.id===tableId) : null);
   const seen = new Set(); const rows = [];
@@ -6434,7 +6461,8 @@ function renderGroupPanel(tableId, fieldId, gid, xg, ev, localTitle, anchorT){
     ${items}
     <div class="gp-btns">
       ${xg
-        ? `<button type="button" class="gp-dissolve" onclick="dissolveXGroup('${xg.id}',event)">解散该组</button>`
+        ? `<button type="button" class="gp-addlink" onclick="addLinkFromXGroup('${tableId}','${xg.id}',event)">增加关联</button>
+      <button type="button" class="gp-dissolve" onclick="dissolveXGroup('${xg.id}',event)">解散该组</button>`
         : `<button type="button" class="gp-addlink" onclick="addLinkFromGroup('${tableId}','${fieldId}','${gid}',event)">增加关联</button>
       <button type="button" class="gp-dissolve" onclick="dissolveGroup('${tableId}','${fieldId}','${gid}',event)">解散该组</button>`}
       <button type="button" class="gp-close" onclick="closeGroupPanel()">关闭</button>
@@ -6482,6 +6510,51 @@ function addLinkFromGroup(tableId, fieldId, gid, ev){
   if(!m){ closeGroupPanel(); return; }
   closeGroupPanel();
   startLinkPick(tableId, m.id, fieldId);
+}
+/* 跨表组"继续加成员"：以前面板里只有「解散该组」，等于没有入口 ✗（真机 2026-10-23：
+   "导入后要关联新成员，不知道怎么操作"）。
+   锚点必须选**本表里属于这一组的行** —— 同表行靠 links 认，跨表行靠 xgroups.rows 认；
+   进关联模式后 `finishLinkMode` 会沿用这个锚点已有的组，不会另起一组 ✓ */
+/* 这一行"属于哪个跨表组"—— 先看 links，再看 xgroups 成员名单。
+   ⚠️ 老数据（v2026-10-23.5 之前关联出来的）本表的行**只有 xgroups 成员、没有 links**，
+   只查 links 会得到 null → 于是又 uid() 新建一个组（真机 2026-10-23：
+   "点增加关联，新加成员和选中成员组成一个新组，只有这两个人"）✗ */
+function xgroupGidOfRow(tableId, rowId){
+  const t = db.tables.find(x=>x.id===tableId);
+  const r = t && t.rows.find(x=>x.id===rowId);
+  if(r && r.links){
+    const k = Object.keys(r.links).find(fid=>r.links[fid]);
+    if(k) return r.links[k];
+  }
+  const g = (db.xgroups||[]).find(x=>(x.rows||[]).some(mm=>mm.t===tableId && mm.r===rowId));
+  return g ? g.id : null;
+}
+/* 把这一组里"本表的成员行"补上 links（老数据自愈）：不补的话本表这一侧永远没有组别号 ✗ */
+function healXGroupLinks(tableId, gid){
+  const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const g = (db.xgroups||[]).find(x=>x.id===gid); if(!g) return;
+  const fid = t.fields.some(f=>f.id===g.fieldId) ? g.fieldId : (t.fields[0] && t.fields[0].id);
+  if(!fid) return;
+  (g.rows||[]).forEach(mm=>{
+    if(mm.t !== tableId) return;
+    const r = t.rows.find(x=>x.id===mm.r); if(!r) return;
+    if(!r.links) r.links = {};
+    const has = Object.keys(r.links).some(k=>r.links[k]===gid);
+    if(!has) r.links[fid] = gid;
+  });
+}
+function addLinkFromXGroup(tableId, xgId, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const g = (db.xgroups||[]).find(x=>x.id===xgId); if(!g) return;
+  const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const mem = (g.rows||[]).find(m=>m.t===tableId);
+  const anchor = mem ? t.rows.find(r=>r.id===mem.r) : null;
+  closeGroupPanel();
+  if(!anchor){ toast('请先长按这条记录 →「关联到其他记录」来加成员'); return; }
+  healXGroupLinks(tableId, g.id);        // 老数据：先把本表成员行的 links 补上 ✓
+  const fid = t.fields.some(f=>f.id===g.fieldId) ? g.fieldId : autoLinkField(t, anchor);
+  if(!fid){ toast('这张表没有可用字段'); return; }
+  startLinkPick(tableId, anchor.id, fid);
 }
 function dissolveGroup(tableId, fieldId, gid, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
@@ -6970,11 +7043,8 @@ function toggleXLink(xtId, xrId, ev){
   updateLinkCount();
   renderLinkResults();
 }
-function xGroupNumbers(){
-  const m = {};
-  (db.xgroups||[]).forEach((g,i)=>{ m[g.id] = i+1; });
-  return m;
-}
+// 跨表组也用**同一套**组别号（以前是 xgroups 的数组下标，和本表的「组N」对不上）
+function xGroupNumbers(){ return groupNoMap(); }
 function xFieldName(g){
   for(const t of db.tables){ const f = t.fields.find(x=>x.id===g.fieldId); if(f) return f.name; }
   return '';
@@ -7042,8 +7112,33 @@ function finishLinkMode(){
       if(typeof p==='string'){ const r = t.rows.find(x=>x.id===p); if(r) rows.push({t:m.tableId, r:r.id}); }
       else rows.push({t:p.t, r:p.r});
     });
-    const gid = uid();
-    (db.xgroups = db.xgroups||[]).push({ id:gid, fieldId:m.fieldId, rows });
+    /* ⚠️ 三处必须一起做，否则跨表关联会"变成另一个组"✗（真机 2026-10-23：
+       "继续关联新成员 → 组别号变了 → 点原组看不到全部成员"）：
+       ① 锚点**已经有组**就沿用（往同一组里加人），不要再 uid() 建新组；
+       ② 成员并进已有的那一组（去重），不要 push 出第二个同 fieldId 的组；
+       ③ **本表的行也要写 links[fieldId]=gid** —— 以前只写进 xgroups，本表这一侧
+          既没有组别号、showXGroup 也找不到锚点，看着就像"关联规则变了" ✗ */
+    let gid = null;
+    const anchorRow = t.rows.find(x=>x.id===m.anchorId);
+    if(anchorRow && anchorRow.links) gid = anchorRow.links[m.fieldId] || anchorRow.links.__any__ || null;
+    if(!gid && anchorRow) gid = xgroupGidOfRow(m.tableId, anchorRow.id);   // 老数据靠成员身份认组
+    if(!gid){
+      for(const p of m.picked){
+        if(typeof p!=='string') continue;
+        const g0 = xgroupGidOfRow(m.tableId, p);
+        if(g0){ gid = g0; break; }
+      }
+    }
+    if(!gid) gid = uid();
+    let xg0 = (db.xgroups||[]).find(x=>x.id===gid);
+    if(!xg0){ xg0 = { id:gid, fieldId:m.fieldId, rows:[] }; (db.xgroups = db.xgroups||[]).push(xg0); }
+    rows.forEach(mb=>{ if(!xg0.rows.some(x=>x.t===mb.t && x.r===mb.r)) xg0.rows.push(mb); });
+    rows.forEach(mb=>{
+      if(mb.t !== t.id) return;                       // 跨表那侧的行不用 links（那边靠 xgroups 认）
+      const rr = t.rows.find(x=>x.id===mb.r); if(!rr) return;
+      if(!rr.links) rr.links = {};
+      rr.links[m.fieldId] = gid;
+    });
     const fld = t.fields.find(x=>x.id===m.fieldId);
     const srcRow = t.rows.find(x=>x.id===m.anchorId);
     const srcName = srcRow && t.fields[0] ? (srcRow.values[t.fields[0].id]||'') : '';
@@ -7063,6 +7158,8 @@ function finishLinkMode(){
     if(r && r.links){ gid = r.links[m.fieldId] || r.links.__any__ || null; }
     if(gid) break;
   }
+  // 老数据：本表行只有 xgroups 成员身份、没有 links → 按成员身份认组，别再新建 ✗
+  if(!gid){ for(const rid of m.picked){ const g0 = xgroupGidOfRow(m.tableId, rid); if(g0){ gid = g0; break; } } }
   if(!gid) gid = uid();
   let n = 0;
   for(const rid of m.picked){
@@ -10802,6 +10899,54 @@ function exportPayloadByTables(list){
   Object.keys(db.bookNames||{}).forEach(k=>{ if(bookIds.has(k)) bookNames[k] = db.bookNames[k]; });
   return { tables: list, folders: (db.folders||[]).filter(f=>folderIds.has(f.id)), xgroups, bookNames };
 }
+/* ===== 按"一批表"直接导出（文件夹 / 多选 共用） =====
+   多工作表的工作簿要把**所有工作表**一起带上，否则又变成"只导出第一张"✗ */
+function bookExpand(list){
+  const out = [], seen = new Set();
+  (list || []).forEach(t=>{
+    if(!t) return;
+    const sheets = bookSheets(t);
+    (sheets.length ? sheets : [t]).forEach(s=>{ if(s && !seen.has(s.id)){ seen.add(s.id); out.push(s); } });
+  });
+  return out;
+}
+/* 某个文件夹里的数据表（只取工作簿头，避免一本多表被重复算） */
+function folderTables(fid){
+  return (db.tables || []).filter(t=>t.folderId === fid && isBookHead(t));
+}
+/* 二选一：下载备份 / 分享出去。列表存在 window 上，按钮点了再取（避免塞进 onclick 字符串） */
+function openExportChoice(list, baseName, title){
+  const arr = (list || []).filter(Boolean);
+  if(!arr.length){ toast('没有可导出的数据表'); return; }
+  window._expList = arr;
+  window._expBase = baseName || '数据表';
+  const books = new Set(arr.map(t=>bookIdOf(t))).size;
+  openModal(`<div class="modal small">
+    <div class="modal-head"><h2>导出${title ? '：' + esc(title) : ''}</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
+    <div class="modal-body" style="padding:16px">
+      <p class="muted" style="margin:-4px 0 12px;font-size:12.5px">
+        共 <b>${books}</b> 个数据表 / <b>${arr.length}</b> 个工作表，<b>连同文件夹归属</b>一起导出；对方导入后会自动归到同名文件夹。
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button type="button" class="btn ghost" onclick="doExportDirect('download')">${svg('i-download')} 下载备份</button>
+        <button type="button" class="btn primary" onclick="doExportDirect('share')">${svg('i-share')} 分享出去</button>
+      </div>
+    </div>
+  </div>`);
+}
+function doExportDirect(kind){
+  const list = window._expList || [];
+  const base = window._expBase || '数据表';
+  window._expList = null; window._expBase = null;
+  if(!list.length){ closeModal(); return; }
+  const payload = exportPayloadByTables(list);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const fname = safeFileBase(base) + '.json';
+  closeModal();
+  if(kind === 'share'){ shareOrDownload(blob, fname, base); return; }
+  download(blob, fname);
+  toast('已开始下载 ' + fname + (isIOSDevice() ? '，请在弹出界面选择「存储到文件」' : ''));
+}
 function doExportSel(kind){
   const list = exportSelectedTables();
   if(!list.length){ toast('请至少勾选一张表'); return; }
@@ -10881,9 +11026,12 @@ function tableExportPayload(t){
   (t.rows||[]).forEach(r=>{ if(r && r.links) Object.keys(r.links).forEach(k=>{ const g = r.links[k]; if(g) gids.add(g); }); });
   // 选组的判据：行上挂了这一组 **或** 这一组里有成员属于本表 ✓
   // （跨表关联组可能只存在 xgroups 里、成员行自己不带标记，只看行标记会漏掉 ✗）
+  // ⚠️ 成员**不能裁到"只属于本表"** ✗ —— 跨表组里另一侧的成员被裁掉后，组就只剩本表这几行，
+  //    对方导入后"关联规则变了、看不到全部成员、新加成员又变成另一个组"（真机 2026-10-23）。
+  //    整组成员原样带走；导入时对方库里没有的表，`doImportSelected` 会按 idMap 自动丢掉 ✓
   const xgroups = (db.xgroups||[])
     .filter(g=>g && (gids.has(g.id) || (g.rows||[]).some(m=>String(m && m.t)===String(t.id))))
-    .map(g=>({ id:g.id, fieldId:g.fieldId, rows:(g.rows||[]).filter(m=>String(m.t)===String(t.id)) }))
+    .map(g=>({ id:g.id, fieldId:g.fieldId, rows:(g.rows||[]).map(m=>({ t:String(m.t||''), r:String(m.r||'') })).filter(m=>m.t && m.r) }))
     .filter(g=>g.rows.length);
   return { v:1, xgroups,
     tables:[{ id:t.id, name:t.name, fields:t.fields, rows:t.rows, updatedAt:t.updatedAt,
@@ -11047,6 +11195,23 @@ function doImportSelected(){
   const newGid = g => { if(!gidMap.has(g)) gidMap.set(g, uid()); return gidMap.get(g); };
   db.bookNames = db.bookNames || {};
   db.xgroups = Array.isArray(db.xgroups) ? db.xgroups : [];
+  /* ⚠️ 文件夹归属必须一起导进来 ✗ —— `normalizeDb({tables:[...]})` 只带了表、没带 folders，
+     校验时 `folderId` 找不到对应文件夹就被置空 → 导入后全落到「未分类」（真机 2026-10-23）✗
+     做法：先按**名字**在现有库里找同文件夹，没有就新建一个，再记下 旧id→新id 的映射 ✓ */
+  const srcFolders = Array.isArray(importAll && importAll.folders) ? importAll.folders : [];
+  const folderMap = new Map();
+  db.folders = Array.isArray(db.folders) ? db.folders : [];
+  srcFolders.forEach(f=>{
+    const nm = String((f && f.name) || '').trim();
+    if(!nm || !f || !f.id) return;
+    let ex = db.folders.find(x=>String(x.name) === nm);
+    if(!ex){
+      const order = db.folders.reduce((m,x)=>Math.max(m, Number(x.order)||0), -1) + 1;
+      ex = { id: uid(), name: nm, order };
+      db.folders.push(ex);
+    }
+    folderMap.set(String(f.id), ex.id);
+  });
   list.forEach(t=>{
     let name = String(t.name||'未命名表');
     if(existing.has(name)){ let k=2; while(existing.has(name+'('+k+')')) k++; name = name+'('+k+')'; }
@@ -11065,6 +11230,8 @@ function doImportSelected(){
       if(!r.links) return;
       Object.keys(r.links).forEach(k=>{ const g = r.links[k]; if(g) r.links[k] = newGid(g); });
     });
+    // 文件夹归属：按导入文件里的 folderId 映射到（可能新建的）目标文件夹
+    if(t.folderId && folderMap.has(String(t.folderId))) nt.folderId = folderMap.get(String(t.folderId));
     db.tables.push(nt);
     added.push(name);
     if(t.id) idMap.set(String(t.id), nt.id);
@@ -11072,12 +11239,14 @@ function doImportSelected(){
   // 跨表关联分组的成员也要并进来，表 id 换成新的
   const srcXg = Array.isArray(importAll && importAll.xgroups) ? importAll.xgroups : [];
   let xgAdded = 0;
+  let xgDropped = 0;      // 因为"那张表不在本次导入里"而被丢掉的跨表成员数（老文件常见）
   srcXg.forEach(g=>{
     if(!g) return;
     // 判据是"这一组有没有成员属于本次导入的表"，**不能只看行上的组标记** ✗ ——
     // 跨表关联组可能只存在 xgroups 里（成员行自己不带标记），那种也必须一起导进来 ✓
     const members = (g.rows||[]).map(m=>{
       const nid = idMap.get(String(m && m.t));
+      if(!nid) xgDropped++;                              // 这张表没一起导入 → 成员只能丢
       return nid ? { t: nid, r: String((m && m.r) || '') } : null;
     }).filter(m=>m && m.r);
     if(!members.length) return;
@@ -11095,7 +11264,8 @@ function doImportSelected(){
   ui.tableQuery = {};
   save(); render();
   toast('已导入 '+added.length+' 张数据表'+(added.length>1 ? '' : '：「'+added[0]+'」')
-        + (xgAdded ? '，含 '+xgAdded+' 个关联分组' : ''));
+        + (xgAdded ? '，含 '+xgAdded+' 个关联分组' : '')
+        + (xgDropped ? '；另有 '+xgDropped+' 条跨表成员因缺少对应数据表未导入' : ''));
 }
 function doImportReplace(){
   closeModal();
